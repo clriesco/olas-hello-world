@@ -36,6 +36,7 @@ from packages.valory.skills.abstract_round_abci.test_tools.rounds import (
 from packages.valory.skills.hello_world_abci.payloads import (
     CollectRandomnessPayload,
     PrintMessagePayload,
+    PrintNumberPayload,
     RegistrationPayload,
     ResetPayload,
     SelectKeeperPayload,
@@ -44,6 +45,7 @@ from packages.valory.skills.hello_world_abci.rounds import (
     CollectRandomnessRound,
     Event,
     PrintMessageRound,
+    PrintNumberRound,
     RegistrationRound,
     ResetAndPauseRound,
     SelectKeeperRound,
@@ -248,6 +250,59 @@ class TestPrintMessageRound(BaseRoundTestClass):
         )
         assert event == Event.DONE
 
+class TestPrintNumberRound(BaseRoundTestClass):
+    """Tests for PrintNumberRound."""
+
+    def test_run(
+        self,
+    ) -> None:
+        """Run tests."""
+
+        test_round = PrintNumberRound(
+            synchronized_data=self.synchronized_data,
+            context=MagicMock(),
+        )
+
+        first_payload, *payloads = [
+            PrintNumberPayload(sender=participant, number=participant)
+            for participant in self.participants
+        ]
+
+        test_round.process_payload(first_payload)
+        assert test_round.collection == {first_payload.sender: first_payload}
+        assert test_round.end_block() is None
+
+        for payload in payloads:
+            test_round.process_payload(payload)
+
+        printed_numbers = [
+            cast(PrintNumberPayload, payload).print_count
+            for payload in test_round.collection.values()
+        ]
+
+        actual_next_behaviour = SynchronizedData(
+            AbciAppDB(
+                setup_data=dict(
+                    participants=[tuple(sorted(test_round.collection))],
+                    printed_numbers=[sorted(printed_numbers)],
+                )
+            )
+        )
+
+        res = test_round.end_block()
+        assert res is not None
+        synchronized_data, event = res
+
+        assert (
+            cast(SynchronizedData, synchronized_data).participants
+            == cast(SynchronizedData, actual_next_behaviour).participants
+        )
+        assert (
+            cast(SynchronizedData, synchronized_data).printed_numbers
+            == cast(SynchronizedData, actual_next_behaviour).printed_numbers
+        )
+        assert event == Event.DONE
+
 
 class TestResetAndPauseRound(BaseRoundTestClass):
     """Tests for ResetAndPauseRound."""
@@ -311,6 +366,7 @@ def test_synchronized_data() -> None:  # pylint:too-many-locals
         participant_to_selection
     )
     most_voted_keeper_address = "keeper"
+    print_count = 0
 
     synchronized_data = SynchronizedData(
         AbciAppDB(
@@ -322,6 +378,7 @@ def test_synchronized_data() -> None:  # pylint:too-many-locals
                     most_voted_randomness=most_voted_randomness,
                     participant_to_selection=participant_to_selection_serialized,
                     most_voted_keeper_address=most_voted_keeper_address,
+                    print_count=print_count,
                 )
             ),
         )
@@ -334,6 +391,7 @@ def test_synchronized_data() -> None:  # pylint:too-many-locals
     assert synchronized_data.participant_to_selection == participant_to_selection
     assert synchronized_data.most_voted_keeper_address == most_voted_keeper_address
     assert synchronized_data.sorted_participants == sorted(participants)
+    assert synchronized_data.print_count == print_count
     actual_keeper_randomness = int(most_voted_randomness, base=16) / MAX_INT_256
     assert (
         abs(synchronized_data.keeper_randomness - actual_keeper_randomness) < 1e-10

@@ -25,7 +25,7 @@ protocols:
 skills:
 - valory/abstract_abci:0.1.0:bafybeieh4ei3qdelmacnm7vwq57phoewgumr3udvxt6pybmuggwc3yk65q
 - valory/abstract_round_abci:0.1.0:bafybeiar2yhzxacfe3qqamqhaihtlcimquwedffctw55sowx6rac3cm3ui
-- valory/hello_world_abci:0.1.0:bafybeidbns5ukkweyfodpa74toilbacqyvvzd4rzrzf4nc2xovmyg6ekka
+- valory/hello_world_abci:0.1.0:bafybeigx6xifpu4fllmici355cznrsivybwpmvn7hu7b54l4ocurjl2ttq
 default_ledger: ethereum
 required_ledgers:
 - ethereum
@@ -70,6 +70,7 @@ models:
   params:
     args:
       hello_world_message: ${str:HELLO_WORLD!}
+      owner: ${str:'0x00006'}
       reset_pause_duration: ${int:10}
       service_registry_address: ${str:null}
       share_tm_config_on_startup: ${bool:false}

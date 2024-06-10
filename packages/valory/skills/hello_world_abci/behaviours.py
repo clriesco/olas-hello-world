@@ -31,6 +31,7 @@ from packages.valory.skills.hello_world_abci.models import HelloWorldParams, Sha
 from packages.valory.skills.hello_world_abci.payloads import (
     CollectRandomnessPayload,
     PrintMessagePayload,
+    PrintNumberPayload,
     RegistrationPayload,
     ResetPayload,
     SelectKeeperPayload,
@@ -39,6 +40,7 @@ from packages.valory.skills.hello_world_abci.rounds import (
     CollectRandomnessRound,
     HelloWorldAbciApp,
     PrintMessageRound,
+    PrintNumberRound,
     RegistrationRound,
     ResetAndPauseRound,
     SelectKeeperRound,
@@ -205,6 +207,34 @@ class PrintMessageBehaviour(HelloWorldABCIBaseBehaviour, ABC):
 
         self.set_done()
 
+class PrintNumberBehaviour(HelloWorldABCIBaseBehaviour, ABC):
+    """Prints the number of prints that have been made."""
+
+    matching_round = PrintNumberRound
+
+    def async_act(self) -> Generator:
+        """
+        Do the action.
+
+        Steps:
+        - Increment the print count.
+        - Print the appropriate to the local console.
+        - Send the transaction with the printed message and wait for it to be mined.
+        - Wait until ABCI application transitions to the next round.
+        - Go to the next behaviour (set done event).
+        """
+        number = self.synchronized_data.print_count + 1
+
+        printed_numer = f"Agent {self.context.agent_name} (address {self.context.agent_address}) in period {self.synchronized_data.period_count} says: {number}"
+        self.context.logger.info(f"printed_number={printed_numer}")
+
+        payload = PrintNumberPayload(self.context.agent_address, number)
+        
+        yield from self.send_a2a_transaction(payload)
+        yield from self.wait_until_round_end()
+
+        self.set_done()
+
 
 class ResetAndPauseBehaviour(HelloWorldABCIBaseBehaviour):
     """Reset behaviour."""
@@ -251,5 +281,6 @@ class HelloWorldRoundBehaviour(AbstractRoundBehaviour):
         CollectRandomnessBehaviour,  # type: ignore
         SelectKeeperBehaviour,  # type: ignore
         PrintMessageBehaviour,  # type: ignore
+        PrintNumberBehaviour,  # type: ignore
         ResetAndPauseBehaviour,  # type: ignore
     }

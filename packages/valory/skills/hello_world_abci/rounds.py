@@ -39,6 +39,7 @@ from packages.valory.skills.hello_world_abci.payloads import (
     RegistrationPayload,
     ResetPayload,
     SelectKeeperPayload,
+    PrintNumberPayload,
 )
 
 
@@ -59,6 +60,11 @@ class SynchronizedData(
 
     This state is replicated by the Tendermint application.
     """
+
+    @property
+    def print_count(self) -> int:
+        """Get the print count."""
+        return cast(int, self.db.get("print_count", 0))
 
     @property
     def printed_messages(self) -> List[str]:
@@ -142,7 +148,16 @@ class PrintMessageRound(CollectDifferentUntilAllRound, HelloWorldABCIAbstractRou
             )
             return synchronized_data, Event.DONE
         return None
+    
 
+class PrintNumberRound(CollectSameUntilThresholdRound, HelloWorldABCIAbstractRound):
+    """This class represents the base print number round."""
+    payload_class = PrintNumberPayload
+    synchronized_data_class = SynchronizedData
+    done_event = Event.DONE
+    no_majority_event = Event.NO_MAJORITY
+    collection_key = get_name(SynchronizedData.participant_to_selection)
+    selection_key = get_name(SynchronizedData.print_count)
 
 class ResetAndPauseRound(CollectSameUntilThresholdRound, HelloWorldABCIAbstractRound):
     """This class represents the base reset round."""
@@ -181,7 +196,10 @@ class HelloWorldAbciApp(AbciApp[Event]):
         3. PrintMessageRound
             - done: 4.
             - round timeout: 0.
-        4. ResetAndPauseRound
+        4. PrintNumberRound
+            - done: 5.
+            - round timeout: 0.
+        5. ResetAndPauseRound
             - done: 1.
             - no majority: 0.
             - reset timeout: 0.
@@ -192,7 +210,10 @@ class HelloWorldAbciApp(AbciApp[Event]):
         round timeout: 30.0
         reset timeout: 30.0
     """
-
+    cross_period_persisted_keys: frozenset[str] = frozenset(
+        [get_name(SynchronizedData.print_count)]
+    )
+    
     initial_round_cls: AppState = RegistrationRound
     transition_function: AbciAppTransitionFunction = {
         RegistrationRound: {
@@ -209,6 +230,10 @@ class HelloWorldAbciApp(AbciApp[Event]):
             Event.ROUND_TIMEOUT: RegistrationRound,
         },
         PrintMessageRound: {
+            Event.DONE: PrintNumberRound,
+            Event.ROUND_TIMEOUT: RegistrationRound,
+        },
+        PrintNumberRound: {
             Event.DONE: ResetAndPauseRound,
             Event.ROUND_TIMEOUT: RegistrationRound,
         },
